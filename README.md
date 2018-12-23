@@ -25,12 +25,12 @@
 **由于老师给的参考文献较多,且属于几个不同方向的,因此想用时间线的方式讲清楚CFI的发展历史以及不同CFI机制的原理等等**          
 20世纪80年代  出现溢出攻击       
 1996年  Aleph One在Underground发表的论文详细描述了Linux系统中栈的结构和如何利用基于栈的缓冲区溢出          
-还没查到  stack canaries提出(因为在stackguard中用到了canary)
+还没查到  stack canaries提出(因为在stackguard中用到了canary)         
 1998年  Cowan, C. Pu等人在USENIX上提出了侦测和防止缓冲区溢出发生的自适应技术(StackGuard **第5篇文章**)      
 2001年  ASLR(地址空间布局随机化)作为Linux内核的一个补丁提出
 2004年  在Windows XP Service Pack 2上提出了DEP(数据执行保护)      
 2010年  介绍CFI机制的概况(**第1篇文章**)       
-2013年  **第2篇文章**
+2013年  **第2篇文章**         
 2014年  Google 间接函数调用检查(**第6篇文章**)         
 2015年  Control-Flow Bending的提出(**第4篇文章**)       
 2017年  对现有CFI机制的安全性和开销作出系统的评价(**第3篇文章**)
