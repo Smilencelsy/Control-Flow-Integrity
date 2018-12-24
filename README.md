@@ -68,7 +68,7 @@ CFI防御机制的核心思想是限制程序运行中的控制流转移，使�
 原始的CFI机制理论上是对所有的间接转移指令进行检查,确保其只能跳转到它自身的目标集合,但这样的开销过大。因此又提出了对CFI改进的方法,接下来我们详细讲解一段CFI分析的过程。       
 首先是对CFG的构建,CFG(Control-Flow Graph)控制流图,其实在第一次报告的时候就有讲过,它是基于静态分析的用图的方式表达程序的执行路径。如下图所示,以分支指令作为边,圆圈则表示普通指令。CFI中的CFG构建与普通CFG比较不同的地方在于,为了降低开销,受检测的边应该越少越好。因此在CFG中只考虑将可能受到攻击的间接call、间接jmp和ret指令作为边。       
 
-<img src="cfg.png" width =50% height = 50% /> </br>
+<img src="cfg.png" width =30% height = 30% /> </br>
 
 构建完CFG后就是动态检测过程。左边是一段C语言程序(简单介绍一下程序流程,对应CFG),右边为CFG及代码段内的所有边缘。文章约定如果指向两个目标地址的边拥有相同的源集合的话,那么这两个目标地址就是等价的,等价的目标用同一label表示。在这段程序中,lt()与gt()的源调用地址相同,因此被标记为同一label 17。在实际执行阶段,由于sort()类似于qsort()是一个静态函数,所以sort2()的call指令属于直接调用,不需要检测。而sort()对于lt和gt的调用属于间接调用,需要检查目标地址的label是否与CFG中设定的一样。比如在图中, call 17,R, 17为目标label,R为保存函数指针的寄存器,对比两者以确保没有被攻击者更改。在lt或gt执行完成后,对ret指令进行同样的检查,sort()的返回也是如此。       
 
@@ -80,15 +80,19 @@ CFI防御机制的核心思想是限制程序运行中的控制流转移，使�
 CCFIR的进步主要在于效率的提升
 
 * 2014年  Google 间接函数调用检查(**第6篇文章**)         
-随着对堆栈的保护越来越完善,出现了很多基于非堆栈的前向转移攻击,尤其是call指令。例如利用UAF漏洞覆盖vtable指针等等。     
-VTV IFCC FScan
+随着对堆栈的保护越来越完善,出现了很多基于非堆栈的前向转移攻击,尤其是call指令。例如利用UAF漏洞覆盖vtable指针等等。这篇文章的主要贡献不是提出了什么新的机制,而是将CFI真正用到了生产编译器中,仅针对于前向转移。以下是主要工作:       
+Vtable Verification (VTV), in GCC 4.9,主要是对vtable调用进行检测,VTV在每个调用点验证用于虚拟调用的vtable指针的有效性。      
+Indirect Function Call Checker (IFCC), in LLVM。它通过为间接调用目标生成跳转表并在间接调用点添加代码来转换函数指针来保护间接调用，从而确保它们指向跳转表条目。任何未指向相应表的函数指针都被视为CFI违规。
+Indirect Function Call Sanitizer (FSan), in LLVM是一个可选的间接调用检查器。       
+
+<img src="googleCompare.png" width =50% height = 50% /> </br>
 
 * 2014-2015年 其他CFI        
-以往 CFI 方案的问题是只实施了控制流不敏感策略，粗粒度 CFI 则是将一组类似或相近类型的目标归到一起进行检查，这种检查还是有一些问题的。因此，上下文敏感的 CFI（Context sensitive CFI）应运而生。它依赖于上下文敏感的静态分析，将 CFI 不变量和 CFG 中的控制流路径联系到一起，运行时在执行路径上强制执行这些不变量。2015 年论文：《CCFI: Cryptographically Enforced Control Flow Integrity》, 提出了一种通过对代码指针加密的方法来增强 CFI 的保护。这个观点出发点是好的，但是在大部分硬件效率跟不上的情况下，几乎不可能在现实中运用，因此 CCFI 被废弃。2014 年的论文：《Complete Control-Flow Integrity for Commodity Operating System Kernels》，他们在操作系统的内核上实现了 CFI，使之免受控制流劫持等攻击，这个系统被称为 KCoFI。他们在基于标签的控制流间接转移保护的基础上，加入一个运行时监控的软件层，负责保护一些关键的操作系统数据结构和监控操作系统进行的所有底层状态操作。（这个系统加入了实时监控系统底层状态操作，如果是高 IO 的情况下，性能表现比较差) 
+基于前述方案的缺陷，又有人提出了上下文敏感的 CFI（Context sensitive CFI）机制。它依赖于上下文敏感的静态分析，将 CFI 不变量和 CFG 中的控制流路径联系到一起，运行时在执行路径上强制执行这些不变量。除此之外,2014 年的论文《Complete Control-Flow Integrity for Commodity Operating System Kernels》在操作系统的内核上实现了 CFI，使之免受控制流劫持等攻击，这个系统被称为 KCoFI。他们在基于标签的控制流间接转移保护的基础上，加入一个运行时监控的软件层，负责保护一些关键的操作系统数据结构和监控操作系统进行的所有底层状态操作。（这个系统加入了实时监控系统底层状态操作，如果是高 IO 的情况下，性能表现比较差) 2015 年论文：《CCFI: Cryptographically Enforced Control Flow Integrity》, 提出了一种通过对代码指针加密的方法来增强 CFI 的保护。这个观点出发点是好的，但是在大部分硬件效率跟不上的情况下，很难在现实中运用。
 
 * 针对前面几种粗粒度CFI提出的攻击方式    
-2014 年的论文《Out of Control: Overcoming Control-Flow Integrity》,DOI: 10.1109/SP.2014.43，中提到了一种攻击手段。他们利用了两种特殊的 Gadget：entry point(EP) gadget 和 call site(CS) gadget，来绕开粗粒度 CFI 机制的防御。     
-2015 年的论文《Losing Control: On the Effectiveness of Control-Flow Integrity under Stack Attacks》,DOI: 10.1145/2810103.2813671，也提到了对 CFI 保护下的栈的攻击手段。在此论文发表前，通过影子栈（Shadow Stack）来检测函数返回目标，再加上 DEP 和 ASLR 的保护，栈应该会变得非常安全，但是事实并非如此。这篇论文中提到了三种攻击手段，他们提出了三种攻击方法：一是利用堆上的漏洞来破坏栈上的 calleesaved 寄 存 器 保 存 区 域， 使得calleesaved 寄存器被劫持；二是利用用户空间和内核之间进行上下文切换的问题，来劫持 sysenter 指令，使控制跳转到攻击者想跳转的位置；       
+当然,前面一直在说粗粒度的CFI不够安全,2014 年的论文《Out of Control: Overcoming Control-Flow Integrity》中就针对粗粒度CFI提到了一种攻击手段。他们利用了两种特殊的 Gadget：entry point(EP) gadget 和 call site(CS) gadget，来绕开粗粒度 CFI 机制的防御。     
+2015 年的论文《Losing Control: On the Effectiveness of Control-Flow Integrity under Stack Attacks》,也提到了对 CFI 保护下的栈的攻击手段。在此论文发表前，通过影子栈（Shadow Stack）来检测函数返回目标，再加上 DEP 和 ASLR 的保护，栈应该会变得非常安全，但是事实并非如此。这篇论文中提到了三种攻击手段，一是利用堆上的漏洞来破坏栈上的 calleesaved 寄 存 器 保 存 区 域， 使得calleesaved 寄存器被劫持；二是利用用户空间和内核之间进行上下文切换的问题，来劫持 sysenter 指令，使控制跳转到攻击者想跳转的位置；       
          
 * 2015年  通过Control-Flow Bending绕过CFI(**第4篇文章**)       
 http://www.cnblogs.com/lzhdcyy/p/6409723.html
@@ -106,7 +110,7 @@ http://www.cnblogs.com/lzhdcyy/p/6409723.html
 * Clang: https://en.wikipedia.org/wiki/Clang (一个编译器前端，用LLVM编译器架构作为其后端)         
 * Microsoft's Control Flow Guard：https://en.wikipedia.org/wiki/Control-flow_integrity       
 * Return Flow Guard: https://xlab.tencent.com/en/2016/11/02/return-flow-guard/ (腾讯玄武实验室)      
-* Google's Indirect Function-Call Checks (第六篇论文 Enforcing)      
+* Google's Indirect Function-Call Checks (gcc 和 llvm)      
 * Reuse Attack Protector： https://grsecurity.net/rap_faq.php (RAP)       
 
 这些都是CFI的一些现有应用,因为时间关系没办法一一介绍,但可以确定的是它们都在性能和安全性上有所取舍。
