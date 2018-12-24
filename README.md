@@ -29,7 +29,7 @@
 1998年  Cowan, C. Pu等人在USENIX上提出了侦测和防止缓冲区溢出发生的自适应技术(StackGuard **第5篇文章**)      
 2001年  ASLR(地址空间布局随机化)作为Linux内核的一个补丁提出     
 2004年  在Windows XP Service Pack 2上提出了DEP(数据执行保护)      
-2005年  第一次提出CFI机制(CCS论文：Control-Flow-Integrity)
+2005年  第一次提出CFI机制(CCS论文：Control-Flow-Integrity)    
 2010年  介绍CFI机制的概况(**第1篇文章**)       
 2013年  由于CFI的性能和兼容性问题导致其不能广泛应用,因此提出了CCFIR(**第2篇文章**)         
 2014年  Google 间接函数调用检查(**第6篇文章**)         
