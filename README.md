@@ -50,32 +50,39 @@ StackGuard是一个编译器扩展,用于检测并阻止对堆栈的缓冲区溢
 因为这篇文章已经发表太久了,就不对性能开销做过多介绍了。         
 <br/>
 * 2001年  ASLR(地址空间布局随机化)的提出       
-2001年,ASLR作为Linux内核的一个补丁提出,它是通过对堆、栈、共享库映射等线性区布局的随机化增加攻击者预测目的地址的难度。绕过ASLR的攻击有之前讲过的堆喷射,攻击未启用ASLR的模块等等。
-<br/>
+2001年,ASLR作为Linux内核的一个补丁提出,它是通过对堆、栈、共享库映射等线性区布局的随机化增加攻击者预测目的地址的难度。绕过ASLR的攻击有之前讲过的堆喷射,攻击未启用ASLR的模块等等。      
+
 * 2004年  在Windows XP Service Pack 2上提出了DEP(数据执行保护)     
 DEP是Windows实现的数据执行保护,还有其他比Windwos实现更早的系统。DEP的之前出现过很多次,就不再细讲了。而针对DEP的攻击有ROP等利用程序中原有的Gadget进行攻击的方法,之前也都讲过了。        
-<br/>
-* 2005年  第一次提出CFI机制(CCS论文：Control-Flow-Integrity)      
+
+* 2005年  第一次提出CFI机制(CCS论文：Control-Flow-Integrity)       
 为了抵御控制流劫持的攻击，2005年CCS上发表了一篇名为《Control-Flow Integrity》的文章，正式提出了CFI的概念。     
-CFI防御机制的核心思想是限制程序运行中的控制流转移，使其始终处于原有的控制流图所限定的范围内。具体做法是分析程序的控制流图(CFG),获取间接转移指令目标的白名单，运行时核对间接转移指令的目标是否在白名单中。控制流劫持往往会违背原有的控制流图，CFI则使这种行为难以实现。      
-<br/>
-2010年  介绍CFI机制的概况(**第1篇文章**)       
-从实现角度上看，又粗粒度和细粒度两种CFI。细粒度CFI严格控制每一个见解转移指令的目标，这会引入很大的开销。粗粒度CFI则是将一组类似或相近类型的目标整理到一起检查，但这种方法会导致安全性下降。     
-<br/>
-2013年  由于CFI的性能和兼容性问题导致其不能广泛应用,因此提出了CCFIR(**第2篇文章**)         
-2014年  Google 间接函数调用检查(**第6篇文章**)         
-2015年  通过Control-Flow Bending绕过CFI(**第4篇文章**)       
-2017年  对现有CFI机制的安全性和开销作出系统的评价(**第3篇文章**)
+CFI防御机制的核心思想是限制程序运行中的控制流转移，使其始终处于原有的控制流图所限定的范围内。其主要分为两个阶段,一是通过二进制或者源代码程序分析的控制流图(CFG),获取间接转移指令目标的白名单(我们一开始提到了直接转移和间接转移,直接转移的操作数是在程序运行前就决定且不可更改的,因此不需要检验,间接转移的操作数是从内存或寄存器中得到的,是有可能被篡改的)，二是运行时检验间接转移指令的目标是否在白名单中。控制流劫持往往会违背原有的控制流图，CFI则使这种行为难以实现。      
+
+* 2010年  介绍CFI机制的概况(**第1篇文章**)       
+原始的CFI机制理论上是对所有的间接转移指令进行检查,确保其只能跳转到它自身的目标集合,但这样的开销过大。因此又提出粗粒度CFI。粗粒度CFI将一组类似或相近类型的目标整理到一起检查,比如将所有间接call指令和间接jmp指令的目标地址归为一类,把所有ret指令的目标地址归为一类,这样可以防止未经验证的返回指令跳转到敏感函数的行为。但是显而易见,这样的粗粒度CFI安全性有很大的下降,像CCFIR,binCFI都属于粗粒度的CFI。     
+
+* 2013年  由于CFI的性能和兼容性问题导致其不能广泛应用,因此提出了CCFIR(**第2篇文章**)         
+CFI
+
+* 2014年  Google 间接函数调用检查(**第6篇文章**)         
+
+* 2014-2015年 其他CFI        
+以往 CFI 方案的问题是只实施了控制流不敏感策略，粗粒度 CFI 则是将一组类似或相近类型的目标归到一起进行检查，这种检查还是有一些问题的。因此，上下文敏感的 CFI（Context sensitive CFI）应运而生。它依赖于上下文敏感的静态分析，将 CFI 不变量和 CFG 中的控制流路径联系到一起，运行时在执行路径上强制执行这些不变量。2015 年论文：《CCFI: Cryptographically Enforced Control Flow Integrity》, 提出了一种通过对代码指针加密的方法来增强 CFI 的保护。这个观点出发点是好的，但是在大部分硬件效率跟不上的情况下，几乎不可能在现实中运用，因此 CCFI 被废弃。2014 年的论文：《Complete Control-Flow Integrity for Commodity Operating System Kernels》，他们在操作系统的内核上实现了 CFI，使之免受控制流劫持等攻击，这个系统被称为 KCoFI。他们在基于标签的控制流间接转移保护的基础上，加入一个运行时监控的软件层，负责保护一些关键的操作系统数据结构和监控操作系统进行的所有底层状态操作。（这个系统加入了实时监控系统底层状态操作，如果是高 IO 的情况下，性能表现比较差) 
+
+* 2014年  针对前面几种粗粒度CFI提出的攻击方式    
+2014 年的论文《Out of Control: Overcoming Control-Flow Integrity》,DOI: 10.1109/SP.2014.43，中提到了一种攻击手段。他们利用了两种特殊的 Gadget：entry point(EP) gadget 和 call site(CS) gadget，来绕开粗粒度 CFI 机制的防御。     
+2015 年的论文《Losing Control: On the Effectiveness of Control-Flow Integrity under Stack Attacks》,DOI: 10.1145/2810103.2813671，也提到了对 CFI 保护下的栈的攻击手段。在此论文发表前，通过影子栈（Shadow Stack）来检测函数返回目标，再加上 DEP 和 ASLR 的保护，栈应该会变得非常安全，但是事实并非如此。这篇论文中提到了三种攻击手段，他们提出了三种攻击方法：一是利用堆上的漏洞来破坏栈上的 calleesaved 寄 存 器 保 存 区 域， 使得calleesaved 寄存器被劫持；二是利用用户空间和内核之间进行上下文切换的问题，来劫持 sysenter 指令，使控制跳转到攻击者想跳转的位置；       
+         
+* 2015年  通过Control-Flow Bending绕过CFI(**第4篇文章**)       
+http://www.cnblogs.com/lzhdcyy/p/6409723.html
+
+* 2017年  对现有CFI机制的安全性和开销作出系统的评价(**第3篇文章**)           
+对不同CFI机制的比较我们在下一节中详细介绍。
+       
 
 
-* CFI的改进       
-严格意义上的CFI需要对每条间接转移指令都进行检查，但插桩引起的开销过大，需要额外信息的支持(比如间接跳转可能的目标集合)，且不能进行增量式的部署。因此又提出了对间接调用指令和函数返回指令的目标进行区分，阻止未经验证的返回指令跳转到敏感函数的行为的CCFIR。它是一个纯粹的二进制转换程序，不依赖源码和调试信息，只依赖重定位表中的信息。CFI、CCFIR、binCFI 都属于粗粒度的 CFI 机制，粗粒度的 CFI 可以降低开销，但是会带来安全上的问题。          
-
-* 针对粗粒度CFI的攻击      
-2014 年的论文《Out of Control: Overcoming Control-Flow Integrity》,DOI: 10.1109/SP.2014.43，中提到了一种攻击手段。他们利用了两种特殊的 Gadget：entry point(EP) gadget 和 call site(CS) gadget，来绕开粗粒度 CFI 机制的防御。2015 年的论文《Losing Control: On the Effectiveness of Control-Flow Integrity under Stack Attacks》,DOI: 10.1145/2810103.2813671，也提到了对 CFI 保护下的栈的攻击手段。在此论文发表前，通过影子栈（Shadow Stack）来检测函数返回目标，再加上 DEP 和 ASLR 的保护，栈应该会变得非常安全，但是事实并非如此。这篇论文中提到了三种攻击手段，他们提出了三种攻击方法：一是利用堆上的漏洞来破坏栈上的 calleesaved 寄 存 器 保 存 区 域， 使得calleesaved 寄存器被劫持；二是利用用户空间和内核之间进行上下文切换的问题，来劫持 sysenter 指令，使控制跳转到攻击者想跳转的位置；三是通过泄露主栈的地址来泄露出 shadow stack 的地址，进而进行攻击。        
-
-* 上下文敏感CFI的提出      
-以往 CFI 方案的问题是只实施了控制流不敏感策略，粗粒度 CFI 则是将一组类似或相近类型的目标归到一起进行检查，这种检查还是有一些问题的。因此，上下文敏感的 CFI（Context sensitive CFI）应运而生。它依赖于上下文敏感的静态分析，将 CFI 不变量和 CFG 中的控制流路径联系到一起，运行时在执行路径上强制执行这些不变量。2015 年论文：《CCFI: Cryptographically Enforced Control Flow Integrity》, 提出了一种通过对代码指针加密的方法来增强 CFI 的保护。（这应该是理论上可行现实中做不到的脑洞，因为开销实在是太大）这个观点出发点是好的，但是在大部分硬件效率跟不上的情况下，几乎不可能在现实中运用，因此 CCFI 被废弃。2014 年的论文：《Complete Control-Flow Integrity for Commodity Operating System Kernels》，他们在操作系统的内核上实现了 CFI，使之免受控制流劫持等攻击，这个系统被称为 KCoFI。他们在基于标签的控制流间接转移保护的基础上，加入一个运行时监控的软件层，负责保护一些关键的操作系统数据结构和监控操作系统进行的所有底层状态操作。（这个系统加入了实时监控系统底层状态操作，如果是高 IO 的情况下，性能表现比较差)       
+    
 
 #### 0x02. 不同CFI的比较(性能、安全性)         
 定性安全保证 => 定量安全计算      
@@ -87,7 +94,9 @@ CFI防御机制的核心思想是限制程序运行中的控制流转移，使�
 * Microsoft's Control Flow Guard：https://en.wikipedia.org/wiki/Control-flow_integrity       
 * Return Flow Guard: https://xlab.tencent.com/en/2016/11/02/return-flow-guard/ (腾讯玄武实验室)      
 * Google's Indirect Function-Call Checks (第六篇论文 Enforcing)      
-* Reuse Attack Protector： https://grsecurity.net/rap_faq.php (RAP)
+* Reuse Attack Protector： https://grsecurity.net/rap_faq.php (RAP)       
+
+这些都是CFI的一些现有应用,因为时间关系没办法一一介绍,但可以确定的是它们都在性能和安全性上有所取舍。
 
 #### 0x04. 个人想法              
 + 粗粒度的CFI安全性不够       
