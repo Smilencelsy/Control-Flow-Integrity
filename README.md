@@ -34,7 +34,9 @@
 1998年,Cowan,C.Pu等人在USENIX上提出了侦测和防止缓冲区溢出发生的自适应技术,即StackGuard。StackGuard是第一个使用 Canary探测的堆栈保护实现，它于1997年作为GCC的一个扩展发布。     
 StackGuard的简要介绍:      
 StackGuard是一个编译器扩展,用于检测并阻止对堆栈的缓冲区溢出攻击。它有两种工作模式,一种是在函数返回之前检测返回地址的变化(Canary),另一种是完全拒绝写入返回地址来阻止动态修改(MemGuard)。      
-第一种方法是,在栈中的返回地址旁放置一个"Canary",在函数返回之前检测Canary是否一致再跳转。
+第一种方法是,在栈中的返回地址旁放置一个"Canary"值,在函数返回之前检测Canary是否一致再跳转。       
+
+<img src="img/stackCanary.png" width =30% height = 30% /> </br>
 
 2001年  ASLR(地址空间布局随机化)作为Linux内核的一个补丁提出     
 2004年  在Windows XP Service Pack 2上提出了DEP(数据执行保护)      
