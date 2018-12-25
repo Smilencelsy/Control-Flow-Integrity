@@ -59,8 +59,8 @@ DEP是Windows实现的数据执行保护,还有其他比Windwos实现更早的�
 <img src="cfiHistory.png" width =80% height = 80% /> </br>
 
 * 2005年  第一次提出CFI机制(CCS论文：Control-Flow-Integrity)       
-在DEP\ASLR\Canary这些技术提出以后,为了能够彻底杜绝控制流劫持类型的攻击，2005年CCS上发表了一篇名为《Control-Flow Integrity》的文章，正式提出了CFI的概念。     
-CFI防御机制的核心思想是限制程序运行中的控制流转移，使其始终处于原有的控制流图所限定的范围内。其主要分为两个阶段,一是通过二进制或者源代码程序分析的控制流图(CFG),获取间接转移指令目标的白名单(我们一开始提到了直接转移和间接转移,直接转移的操作数是在程序运行前就决定且不可更改的,因此不需要检验,间接转移的操作数是从内存或寄存器中得到的,是有可能被篡改的)，二是运行时检验间接转移指令的目标是否在白名单中。控制流劫持往往会违背原有的控制流图，CFI则使这种行为难以实现。      
+在DEP\ASLR\Canary这些技术提出以后,可能为了能够彻底杜绝控制流劫持类型的攻击，2005年CCS上发表了一篇名为《Control-Flow Integrity》的文章，正式提出了CFI的概念。     
+CFI防御机制的核心思想是限制程序运行中的控制流转移，使其始终处于原有的控制流图所限定的范围内。其主要分为两个阶段,一是通过二进制或者源代码程序分析的控制流图(CFG),获取间接转移指令目标的白名单(我们一开始提到了直接转移和间接转移,直接转移的操作数是在程序运行前就决定且不可更改的,可以由W⊕X机制保护,因此不需要检验,间接转移的操作数是从内存或寄存器中得到的,是有可能被篡改的)，二是运行时检验间接转移指令的目标是否在白名单中。控制流劫持往往会违背原有的控制流图，CFI则使这种行为难以实现。      
 
 <img src="cfiIntro.png" width =50% height = 50% /> </br>
 
@@ -76,8 +76,11 @@ CFI防御机制的核心思想是限制程序运行中的控制流转移，使�
 
 以上就是一种粗粒度的CFI,它将多个不同的目标地址合在一起减少需要检测目标地址的数量。可以看出为了降低性能开销,是以牺牲安全性为前提的。
 
-* 2013年  由于CFI的性能和兼容性问题导致其不能广泛应用,因此提出了CCFIR(**第2篇文章**)         
-CCFIR的进步主要在于效率的提升
+* 2013年  CCFIR的提出(**第2篇文章**)         
+在CFI被提出后过了很长时间都没有被广泛应用到实际生产中去,主要原因还是插桩引起的开销过大。因此在2013年又提出了CCFIR,在同一年提出的还有binCFI,ModularCFI等等,但CCFIR是非常典型的一个实现。与上面我们所讲的机制将目标集合按照指向边的源集合是否相同来划分不一样,CCFIR更加简洁的将目标集合划分为了三类。所有的间接call和jmp指令的目标被归为一类,称为函数指针;ret指令的目标被归为两类,一类是敏感库函数(比如libc中的额system函数),另一类是普通函数。下面我们以下图中的例子来说明CCFIR的工作原理:     
+
+
+<img src="ccfir.png" width =50% height = 50% /> </br>
 
 * 2014年  Google 间接函数调用检查(**第6篇文章**)         
 随着对堆栈的保护越来越完善,出现了很多基于非堆栈的前向转移攻击,尤其是call指令。例如利用UAF漏洞覆盖vtable指针等等。这篇文章的主要贡献不是提出了什么新的机制,而是将CFI真正用到了生产编译器中,仅针对于前向转移。以下是主要工作:       
@@ -88,10 +91,10 @@ Indirect Function Call Sanitizer (FSan), in LLVM是一个可选的间接调用�
 <img src="googleCompare.png" width =50% height = 50% /> </br>
 
 * 2014-2015年 其他CFI        
-基于前述方案的缺陷，又有人提出了上下文敏感的 CFI（Context sensitive CFI）机制。它依赖于上下文敏感的静态分析，将 CFI 不变量和 CFG 中的控制流路径联系到一起，运行时在执行路径上强制执行这些不变量。除此之外,2014 年的论文《Complete Control-Flow Integrity for Commodity Operating System Kernels》在操作系统的内核上实现了 CFI，使之免受控制流劫持等攻击，这个系统被称为 KCoFI。他们在基于标签的控制流间接转移保护的基础上，加入一个运行时监控的软件层，负责保护一些关键的操作系统数据结构和监控操作系统进行的所有底层状态操作。（这个系统加入了实时监控系统底层状态操作，如果是高 IO 的情况下，性能表现比较差) 2015 年论文：《CCFI: Cryptographically Enforced Control Flow Integrity》, 提出了一种通过对代码指针加密的方法来增强 CFI 的保护。这个观点出发点是好的，但是在大部分硬件效率跟不上的情况下，很难在现实中运用。
+基于前述方案的缺陷，又有人提出了上下文敏感的 CFI（Context sensitive CFI）机制。它依赖于上下文敏感的静态分析，将 CFI 不变量和 CFG 中的控制流路径联系到一起，运行时在执行路径上强制执行这些不变量。2014 年的论文《Complete Control-Flow Integrity for Commodity Operating System Kernels》在操作系统的内核上实现了 CFI，使之免受控制流劫持等攻击，这个系统被称为 KCoFI。他们在基于标签的控制流间接转移保护的基础上，加入一个运行时监控的软件层，负责保护一些关键的操作系统数据结构和监控操作系统进行的所有底层状态操作。（这个系统加入了实时监控系统底层状态操作，如果是高 IO 的情况下，性能表现比较差) 2015 年论文：《CCFI: Cryptographically Enforced Control Flow Integrity》, 提出了一种通过对代码指针加密的方法来增强 CFI 的保护。这个观点出发点是好的，但是在大部分硬件效率跟不上的情况下，很难在现实中运用。
 
 * 针对前面几种粗粒度CFI提出的攻击方式    
-当然,前面一直在说粗粒度的CFI不够安全,2014 年的论文《Out of Control: Overcoming Control-Flow Integrity》中就针对粗粒度CFI提到了一种攻击手段。他们利用了两种特殊的 Gadget：entry point(EP) gadget 和 call site(CS) gadget，来绕开粗粒度 CFI 机制的防御。     
+当然,攻防是相对应的,前面一直在说粗粒度的CFI不够安全,2014 年的论文《Out of Control: Overcoming Control-Flow Integrity》中就针对粗粒度CFI提到了一种攻击手段。他们利用了两种特殊的 Gadget：entry point(EP) gadget 和 call site(CS) gadget，来绕开粗粒度 CFI 机制的防御。     
 2015 年的论文《Losing Control: On the Effectiveness of Control-Flow Integrity under Stack Attacks》,也提到了对 CFI 保护下的栈的攻击手段。在此论文发表前，通过影子栈（Shadow Stack）来检测函数返回目标，再加上 DEP 和 ASLR 的保护，栈应该会变得非常安全，但是事实并非如此。这篇论文中提到了三种攻击手段，一是利用堆上的漏洞来破坏栈上的 calleesaved 寄 存 器 保 存 区 域， 使得calleesaved 寄存器被劫持；二是利用用户空间和内核之间进行上下文切换的问题，来劫持 sysenter 指令，使控制跳转到攻击者想跳转的位置；       
          
 * 2015年  通过Control-Flow Bending绕过CFI(**第4篇文章**)       
@@ -113,12 +116,13 @@ http://www.cnblogs.com/lzhdcyy/p/6409723.html
 * Google's Indirect Function-Call Checks (gcc 和 llvm)      
 * Reuse Attack Protector： https://grsecurity.net/rap_faq.php (RAP)       
 
-这些都是CFI的一些现有应用,因为时间关系没办法一一介绍,但可以确定的是它们都在性能和安全性上有所取舍。
+这些都是CFI的一些现有应用,因为时间关系没办法一一介绍,但可以确定的是它们都在性能和安全性上有所取舍。       
 
 #### 0x04. 个人想法              
 + 粗粒度的CFI安全性不够       
 + 细粒度的CFI性能开销太大      
-+ 出现很多CFI无法防护的攻击——Data oriented programming(上一节课讲过的DOP)
++ 出现很多CFI无法防护的攻击——Data oriented programming(上一节课讲过的DOP)        
+以上对于CFI的介绍主要还是策略方面,因为随着软硬件的发展,对于不同的硬件、操作系统、编译器甚至语言都会有不同的实现方式,而且没有哪一种可以说是完美无缺的。但是在git中我们给出了很多CFI机制的文献和应用场景,欢迎大家探讨交流。
 
 ### 参考文献
 ---
